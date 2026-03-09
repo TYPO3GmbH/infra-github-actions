@@ -1,0 +1,13 @@
+name: Setup PHP
+inputs:
+  php-version:
+    required: true
+    default: '8.2'
+runs:
+  using: composite
+  steps:
+    - name: Setup PHP ${{ inputs.php-version }}
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+        coverage: pcov

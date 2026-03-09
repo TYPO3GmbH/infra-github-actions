@@ -1,0 +1,17 @@
+name: Configure Composer cache
+runs:
+  using: composite
+  steps:
+    - name: Set Composer cache directory
+      id: composer-cache-dir
+      shell: bash
+      run: |
+        echo "dir=$(composer config cache-files-dir)" >> ${GITHUB_OUTPUT}
+
+    - name: Recover Composer caches
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-

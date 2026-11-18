@@ -54,8 +54,6 @@ set('build_assets_paths', ['public/build']);
 
 // Commands run in the new release after it went live, e.g. '{{bin/php}} ./bin/console cache:warmup'
 set('post_release_commands', []);
-// systemd user services restarted after the post release commands, e.g. ['app-messages.service']
-set('systemd_user_services', []);
 
 /*
  * cachetool releases with the lowest supported PHP version and the SHA-256 of their cachetool.phar, newest first.
@@ -144,13 +142,6 @@ task('deploy:post_release', function (): void {
     }
 });
 
-desc('Restarts the systemd user services of the host');
-task('deploy:restart_services', function (): void {
-    foreach (get('systemd_user_services') as $service) {
-        run('/bin/systemctl --user restart ' . escapeshellarg($service));
-    }
-});
-
 desc('Deploys the project');
 task('deploy', [
     'deploy:check_config',
@@ -164,7 +155,6 @@ task('deploy', [
     'deploy:symlink',
     'deploy:opcache_reset',
     'deploy:post_release',
-    'deploy:restart_services',
     'deploy:unlock',
     'deploy:cleanup',
     'deploy:success',

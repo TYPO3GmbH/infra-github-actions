@@ -11,7 +11,7 @@ Generic [Deployer](https://deployer.org) 8 recipe (`recipe.php`) for PHP project
 - Links `shared_dirs` and `shared_files` from `site/mage/shared`.
 - Resets the OPcache with [cachetool](https://github.com/gordalina/cachetool). The release matching the PHP version is
   downloaded from GitHub and verified against its pinned SHA-256.
-- Runs post release commands and restarts systemd user services.
+- Runs post release commands, e.g. migrations or `messenger:stop-workers`.
 - SSH only accepts the pinned host keys in `build/deploy/known_hosts`.
 
 Server layout:
@@ -49,13 +49,14 @@ set('shared_files', ['.env.local']);
 set('post_release_commands', [
     '{{bin/php}} ./bin/console doctrine:migrations:migrate --no-interaction',
     '{{bin/php}} ./bin/console cache:warmup',
+    // Messenger workers stop gracefully and are restarted by their process manager with the new release
+    '{{bin/php}} ./bin/console messenger:stop-workers',
 ]);
 
 // Host aliases match the branch names, the vhost defaults to the SSH user
 host('master')
     ->setHostname('shared-small.typo3.com')
-    ->setRemoteUser('example.typo3.com')
-    ->set('systemd_user_services', ['example-messages.service']);
+    ->setRemoteUser('example.typo3.com');
 
 host('develop')
     ->setHostname('shared-small.typo3.com')
@@ -96,6 +97,11 @@ Deployment job (Deployer 8 requires PHP 8.3 on the runner):
 
 Running a deployment locally requires the checkout of this repository in `.github/actions/t3g` as well.
 
+Symfony Messenger workers are stopped with `messenger:stop-workers` in the post release commands, their process
+manager (e.g. a systemd service with `Restart=always`) starts them again with the new release. The signal is stored in
+the `cache.app` pool, so `framework.cache.prefix_seed` has to be fixed (e.g. `vendor/app-name`). The default seed
+contains the release directory, the new release would send the signal to a namespace the running workers don't read.
+
 ## Settings
 
 | Setting                   | Default                                                 | Description                                                         |
@@ -116,7 +122,6 @@ Running a deployment locally requires the checkout of this repository in `.githu
 | `build_assets_command`    | `npm ci && npm run build`                               | Frontend build, run in the checkout                                 |
 | `build_assets_paths`      | `['public/build']`                                      | Paths created by the frontend build, copied into the build          |
 | `post_release_commands`   | `[]`                                                    | Run in the new release after it went live                           |
-| `systemd_user_services`   | `[]`                                                    | Restarted with `systemctl --user` after the post release commands   |
 | `cachetool_version`       | from `cachetool_releases`                               | Override together with `cachetool_sha256`                           |
 | `cachetool_sha256`        | from `cachetool_releases`                               |                                                                     |
 

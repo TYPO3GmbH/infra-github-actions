@@ -5,7 +5,8 @@ Generic [Deployer](https://deployer.org) 8 recipe (`recipe.php`) for PHP project
 - Checks the configuration of all hosts first, e.g. a missing `php_version` fails before anything is built.
 - Builds `git archive HEAD` with a production Composer install on the CI runner. Paths marked `export-ignore` in
   `.gitattributes` are left out.
-- Optionally builds frontend assets (e.g. npm) in the checkout and copies them into the build.
+- Builds the frontend assets (`npm ci && npm run build`) in the checkout and copies them into the build, can be
+  disabled for projects without assets.
 - Uploads the build as a single tar.gz archive and unpacks it into a new release.
 - Links `shared_dirs` and `shared_files` from `site/mage/shared`.
 - Resets the OPcache with [cachetool](https://github.com/gordalina/cachetool). The release matching the PHP version is
@@ -42,9 +43,8 @@ set('php_version', '8.3');
 set('shared_dirs', ['var']);
 set('shared_files', ['.env.local']);
 
-// Optional, only for projects with a frontend build
-set('build_assets_command', 'npm ci && npm run build');
-set('build_assets_paths', ['public/build']);
+// Only for projects without frontend assets, the npm build is enabled by default
+// set('build_assets', false);
 
 set('post_release_commands', [
     '{{bin/php}} ./bin/console doctrine:migrations:migrate --no-interaction',
@@ -112,8 +112,9 @@ Running a deployment locally requires the checkout of this repository in `.githu
 | `known_hosts_file`        | `build/deploy/known_hosts`                              | Pinned host keys, relative to the project root                      |
 | `build_env`               | `['APP_ENV' => 'prod']`                                 | Environment of the Composer install                                 |
 | `build_composer_command`  | `composer install --no-dev --optimize-autoloader` (...) |                                                                     |
-| `build_assets_command`    | `''` (skipped)                                          | Frontend build, run in the checkout                                 |
-| `build_assets_paths`      | `[]`                                                    | Paths created by the frontend build, copied into the build          |
+| `build_assets`            | `true`                                                  | `false` skips the frontend build, e.g. for projects without npm     |
+| `build_assets_command`    | `npm ci && npm run build`                               | Frontend build, run in the checkout                                 |
+| `build_assets_paths`      | `['public/build']`                                      | Paths created by the frontend build, copied into the build          |
 | `post_release_commands`   | `[]`                                                    | Run in the new release after it went live                           |
 | `systemd_user_services`   | `[]`                                                    | Restarted with `systemctl --user` after the post release commands   |
 | `cachetool_version`       | from `cachetool_releases`                               | Override together with `cachetool_sha256`                           |

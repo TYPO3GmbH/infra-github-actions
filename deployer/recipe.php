@@ -10,8 +10,8 @@ use function Deployer\Support\deployer_root;
  * Deployer recipe for PHP projects on the T3G vhost servers, see README.md in this directory.
  *
  * The code is built on the CI runner: `git archive` of HEAD (paths marked `export-ignore` in .gitattributes are left
- * out), production Composer install and optionally frontend assets built in the checkout. The build is uploaded as a
- * single tar.gz archive and unpacked into the new release on the server. Server layout:
+ * out), production Composer install and frontend assets built in the checkout (unless disabled). The build is uploaded
+ * as a single tar.gz archive and unpacked into the new release on the server. Server layout:
  *
  *   /srv/vhosts/<vhost>/site/mage/releases/<release>   releases
  *   /srv/vhosts/<vhost>/site/mage/current              symlink to the active release (document root)
@@ -46,10 +46,11 @@ set('build_path', sys_get_temp_dir() . '/deployer-build-' . basename(deployer_ro
 set('build_archive', '{{build_path}}.tar.gz');
 set('build_env', ['APP_ENV' => 'prod']);
 set('build_composer_command', 'composer install --no-interaction --no-progress --no-dev --optimize-autoloader');
-// Frontend build, run in the checkout. Empty to skip, e.g. 'npm ci && npm run build'
-set('build_assets_command', '');
-// Paths created by build_assets_command that are copied into the build, e.g. ['public/build']
-set('build_assets_paths', []);
+// Frontend build, run in the checkout. Disable it for projects without assets: set('build_assets', false);
+set('build_assets', true);
+set('build_assets_command', 'npm ci && npm run build');
+// Paths created by build_assets_command that are copied into the build
+set('build_assets_paths', ['public/build']);
 
 // Commands run in the new release after it went live, e.g. '{{bin/php}} ./bin/console cache:warmup'
 set('post_release_commands', []);
@@ -99,7 +100,7 @@ task('deploy:build', function (): void {
     runLocally(get('build_composer_command'), cwd: $buildPath, timeout: 900, env: get('build_env'));
 
     // The frontend build files are usually export-ignored, so the assets are built in the checkout and copied
-    if (get('build_assets_command') !== '') {
+    if (get('build_assets')) {
         runLocally(get('build_assets_command'), cwd: $root, timeout: 900);
         foreach (get('build_assets_paths') as $path) {
             $target = escapeshellarg("$buildPath/$path");

@@ -1,5 +1,6 @@
 name: Setup node
 inputs:
+  node-version:
     required: true
     default: '24'
 runs:
@@ -8,4 +9,4 @@ runs:
     - name: Setup node ${{ inputs.node-version }}
       uses: actions/setup-node@v6
       with:
-        node-version-file: '.nvmrc'
+        node-version: ${{ inputs.node-version }}

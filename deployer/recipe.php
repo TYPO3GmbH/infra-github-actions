@@ -13,10 +13,11 @@ use function Deployer\Support\deployer_root;
  * out), production Composer install and frontend assets built in the checkout (unless disabled). The build is uploaded
  * as a single tar.gz archive and unpacked into the new release on the server. Server layout:
  *
- *   /srv/vhosts/<vhost>/site/mage/releases/<release>   releases
- *   /srv/vhosts/<vhost>/site/mage/current              symlink to the active release (document root)
- *   /srv/vhosts/<vhost>/site/mage/shared               shared_dirs and shared_files
- *   /srv/vhosts/<vhost>/site/cachetool                 cachetool phar, used to reset the OPcache
+ *   /srv/vhosts/<vhost>/site/releases/<release>   releases
+ *   /srv/vhosts/<vhost>/site/current              symlink to the active release
+ *   /srv/vhosts/<vhost>/site/public               symlink to current/public (document root of the vhost)
+ *   /srv/vhosts/<vhost>/site/shared               shared_dirs and shared_files
+ *   /srv/vhosts/<vhost>/site/cachetool            cachetool phar, used to reset the OPcache
  */
 
 require 'recipe/common.php';
@@ -31,8 +32,11 @@ set('keep_releases', 3);
 // The vhost defaults to the SSH user, which is named after the vhost
 set('vhost', fn (): string => currentHost()->getRemoteUser() ?? throw error('Set the remote user or the vhost of the host.'));
 set('site_path', '/srv/vhosts/{{vhost}}/site');
-set('deploy_path', '{{site_path}}/mage');
+set('deploy_path', '{{site_path}}');
 set('fpm_socket', '/var/run/{{vhost}}_fpm.sock');
+// Document root of the vhost, a symlink to the public directory of the active release
+set('docroot_path', '{{site_path}}/public');
+set('docroot_target', '{{current_path}}/public');
 
 // Only connect to servers with pinned host keys, relative to the project root (the directory of deploy.php)
 set('known_hosts_file', 'build/deploy/known_hosts');
@@ -123,6 +127,20 @@ task('deploy:upload', function (): void {
     run("tar -xzf $archive -C {{release_path}} && rm $archive", timeout: 900);
 });
 
+desc('Links the document root of the vhost to the public directory of the active release');
+task('deploy:docroot', function (): void {
+    $link = get('docroot_path');
+    $target = get('docroot_target');
+    if (test("[ -e $link ] && [ ! -L $link ]")) {
+        throw error("The document root $link exists and is not a symlink, remove it to let the recipe link it.");
+    }
+    // The link points to current, which is switched with every release, so it only changes when it is missing or
+    // points elsewhere. Replaced atomically like current, the vhost never sees a missing document root.
+    if (!test("[ \"$(readlink $link)\" = '$target' ]")) {
+        run("ln -sfn $target $link.tmp && mv -fT $link.tmp $link");
+    }
+});
+
 desc('Resets the OPcache of the PHP-FPM pool');
 task('deploy:opcache_reset', function (): void {
     $cachetool = '{{site_path}}/cachetool/cachetool-{{cachetool_version}}.phar';
@@ -153,6 +171,7 @@ task('deploy', [
     'deploy:upload',
     'deploy:shared',
     'deploy:symlink',
+    'deploy:docroot',
     'deploy:opcache_reset',
     'deploy:post_release',
     'deploy:unlock',

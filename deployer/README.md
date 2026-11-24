@@ -8,7 +8,9 @@ Generic [Deployer](https://deployer.org) 8 recipe (`recipe.php`) for PHP project
 - Builds the frontend assets (`npm ci && npm run build`) in the checkout and copies them into the build, can be
   disabled for projects without assets.
 - Uploads the build as a single tar.gz archive and unpacks it into a new release.
-- Links `shared_dirs` and `shared_files` from `site/mage/shared`.
+- Links `shared_dirs` and `shared_files` from `site/shared`.
+- Links the document root `site/public` to `site/current/public`, an existing link (e.g. to `mage/current/public`) is
+  replaced.
 - Resets the OPcache with [cachetool](https://github.com/gordalina/cachetool). The release matching the PHP version is
   downloaded from GitHub and verified against its pinned SHA-256.
 - Runs post release commands, e.g. migrations or `messenger:stop-workers`.
@@ -17,10 +19,11 @@ Generic [Deployer](https://deployer.org) 8 recipe (`recipe.php`) for PHP project
 Server layout:
 
 ```
-/srv/vhosts/<vhost>/site/mage/releases/<release>   releases
-/srv/vhosts/<vhost>/site/mage/current              symlink to the active release (document root)
-/srv/vhosts/<vhost>/site/mage/shared               shared_dirs and shared_files
-/srv/vhosts/<vhost>/site/cachetool                 cachetool phar
+/srv/vhosts/<vhost>/site/releases/<release>   releases
+/srv/vhosts/<vhost>/site/current              symlink to the active release
+/srv/vhosts/<vhost>/site/public               symlink to current/public (document root of the vhost)
+/srv/vhosts/<vhost>/site/shared               shared_dirs and shared_files
+/srv/vhosts/<vhost>/site/cachetool            cachetool phar
 ```
 
 ## Usage
@@ -110,7 +113,9 @@ contains the release directory, the new release would send the signal to a names
 | `bin/php`                 | `/usr/bin/php{{php_version}}`                           | PHP binary on the server                                            |
 | `vhost`                   | SSH user of the host                                    | Name of the vhost                                                   |
 | `site_path`               | `/srv/vhosts/{{vhost}}/site`                            |                                                                     |
-| `deploy_path`             | `{{site_path}}/mage`                                    |                                                                     |
+| `deploy_path`             | `{{site_path}}`                                         |                                                                     |
+| `docroot_path`            | `{{site_path}}/public`                                  | Document root of the vhost, linked to `docroot_target`              |
+| `docroot_target`          | `{{current_path}}/public`                               |                                                                     |
 | `fpm_socket`              | `/var/run/{{vhost}}_fpm.sock`                           | PHP-FPM socket for the OPcache reset                                |
 | `keep_releases`           | `3`                                                     |                                                                     |
 | `shared_dirs`             | `[]`                                                    | Removed from the build and linked from `shared`                     |
